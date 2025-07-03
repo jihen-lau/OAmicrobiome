@@ -1,0 +1,5 @@
+# Ignore hidden file tracker in MacOS
+.DS_Store
+
+# Ignore data and metadata
+*.csv
