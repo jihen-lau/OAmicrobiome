@@ -130,56 +130,52 @@ get_tribe <- function(sampleID) {
 shannon_index_df$tribe <- sapply(shannon_index_df$sampleID, get_tribe)
 
 ## Normality test
-# Q-Q Plot
-qqnorm(shannon_index_df$Shannon_Index)
-qqline(shannon_index_df$Shannon_Index, col = "red")
+for (tribe in unique(shannon_index_df$tribe)) {
+  tribe_data <- shannon_index_df$Shannon_Index[shannon_index_df$tribe == tribe]
+  cat("Shapiro-Wilk test for Shannon_Index in", tribe, ":\n")
+  print(shapiro.test(tribe_data))
+  cat("\n")
+}
 
-# shapiro
-shapiro.test(shannon_index_df$Shannon_Index)
+# Perform one-way ANOVA
+anova_result <- aov(Shannon_Index ~ tribe, data = shannon_index_df)
+summary(anova_result)
 
-## statistical test
-kruskal_result <- kruskal.test(Shannon_Index ~ tribe, data = shannon_index_df)
-
-# Extracting the chi-squared statistic and p-value
-kruskal_chisq <- kruskal_result$statistic
-kruskal_pvalue <- kruskal_result$p.value
-
-# pairwise comparison
-dunn.test(shannon_index_df$Shannon_Index, shannon_index_df$tribe, kw = TRUE)
+# adhoc test
+TukeyHSD(anova_result)
 
 # re-arrange tribe according to least urban to most urban
-shannon_index_df$tribe <- factor(shannon_index_df$tribe, 
+shannon_index_df$tribe <- factor(shannon_index_df$tribe,
                                  levels = c("Jahai", "Temiar", "Temuan", "Malay"))
 
 # Create the boxplot
 boxplot <- ggplot(shannon_index_df, aes(x = tribe, y = Shannon_Index, fill = tribe)) +
   geom_boxplot(outlier.shape = NA) +
-  labs(title = "Shannon Index Distribution by Tribe",
-       x = "Tribe",
-       y = "Shannon Index") +
+  labs(title = "Shannon Index Distribution by Group",
+       x = "Group",
+       y = "Shannon Index",
+       fill = "Group") +
   scale_fill_manual(values = c("Jahai" = "darkgreen", "Temiar" = "skyblue",
                                "Temuan" = "orange", "Malay" = "pink")) +
   geom_jitter(width = 0.2, color = "blue") +
   theme_classic() +
   theme(axis.text.x = element_text()) +
   ggsignif::geom_signif(
-    comparisons = list(c("Jahai", "Malay"), c("Jahai", "Temuan")),
+    comparisons = list(c("Jahai", "Temuan")),
+    annotations = "p = 0.042",
     map_signif_level = TRUE,
-    textsize = 3,
+    textsize = 3.5,
     y_position = c(3, 3.2)
-  )
-
-plot2 <- boxplot + annotate("text", x = 0.8, y = 4, 
-                            label = paste("Kruskal-Wallis chi-squared = ", round(kruskal_chisq, 2),
-                                          "\np-value = ", format(kruskal_pvalue, scientific = TRUE)), 
-                            hjust = 0, vjust = 1.5, size = 4, color = "red")
-plot2
+  ) +
+  annotate("text", x = 1.5, y = 3.5, 
+           label = "ANOVA: p = 0.0402", size = 4, color = "red")
+boxplot
 
 # Save as PNG
-# ggsave("resfinder_plot2_shannonBoxPlot.png", plot = plot2, width = 10, height = 6, units = "in")
+# ggsave("resfinder_plot2_shannonBoxPlot_revised.png", plot = boxplot, width = 10, height = 6, units = "in")
 
 # Save as PDF
-# ggsave("resfinder_plot2_shannonBoxPlot.pdf", plot = plot2, width = 10, height = 6, units = "in")
+# ggsave("resfinder_plot2_shannonBoxPlot_revised.pdf", plot = boxplot, width = 10, height = 6, units = "in")
 
 # Distribution (Region Group) ----
 
