@@ -3,3 +3,6 @@
 
 # Ignore data and metadata
 *.csv
+
+# Ignore Rhistory
+.Rhistory
