@@ -29,7 +29,7 @@ kma_out <- kma_out %>%
 
 # Distribution (Tribe) ----
 
-# Perform Shapiro-Wilk test on log-transformed values for each tribe
+# Perform Shapiro-Wilk test on RPKM of each tribe
 for (tribe in unique(kma_out$tribe)) {
   tribe_data <- kma_out$RPKM[kma_out$tribe == tribe]
   cat("Shapiro-Wilk test for RPKM in", tribe, ":\n")
@@ -47,40 +47,45 @@ kruskal_pvalue <- kruskal_result$p.value
 
 # dunn test
 dunn_test_result <- dunn.test(kma_out$RPKM, kma_out$tribe, method = "bonferroni")
+data.frame(
+  comparison = dunn_test_result$comparisons,
+  p_value = dunn_test_result$P.adjusted
+)
 
 # re-arrange tribe according to least urban to most urban
 kma_out$tribe <- factor(kma_out$tribe, levels = c("Jahai", "Temiar", "Temuan", "Malay"))
 
 # visualization
-rpkm_boxPlot_tribes <- ggplot(kma_out, aes(x = tribe, y = RPKM, fill = tribe)) +
-  geom_boxplot() +
+rpkm_plot_groups <- ggplot(kma_out, aes(x = tribe, y = RPKM, fill = tribe)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.1, fill = "white") +
+  # geom_jitter(width = 0.2, alpha = 0.7, size = 1.5) +
   scale_y_log10() +
   theme_classic() +
   scale_fill_manual(values = c("Jahai" = "darkgreen", "Temiar" = "skyblue",
                                "Temuan" = "orange", "Malay" = "pink")) +
   theme(axis.text.x = element_text()) +
-  labs(title = "Boxplot of RPKM (log scale) by Tribe", y = "RPKM (log scale)", x = "Sample ID") +
+  labs(x = "Group",
+       y = "ARG Load (Log scaled RPKM)", 
+       fill = "Groups") +
   ggsignif::geom_signif(
-    comparisons = list(c("Temiar", "Temuan"), 
-                       c("Jahai", "Temiar"), 
+    comparisons = list(c("Temiar", "Temuan"),
+                       c("Jahai", "Temiar"),
                        c("Temiar", "Malay")),
     map_signif_level = TRUE,
+    annotations = c("p = 3.0484e-05",
+                    "p = 1.8472e-04",
+                    "p = 1.6855e-03"),
     textsize = 3,
-    y_position = c(7, 6, 6)
+    y_position = c(7, 6.5, 6.5)
   )
-
-plot1 <- rpkm_boxPlot_tribes + 
-  annotate("text", x = 1, y = 1e09, 
-           label = paste("Kruskal-Wallis chi-squared = ", round(kruskal_chisq, 2),
-                         "\np-value = ", format(kruskal_pvalue, scientific = TRUE)), 
-           hjust = 0, vjust = 1.5, size = 3.2, color = "red")
-plot1
+rpkm_plot_groups
 
 # Save as PNG
-# ggsave("resfinder_plot1_distributionBoxPlot.png", plot = plot1, width = 10, height = 6, units = "in")
+# ggsave("resfinder_rpkmPlot_groups.png", plot = rpkm_plot_groups, width = 10, height = 6, units = "in")
 
 # Save as PDF
-# ggsave("resfinder_plot1_distributionBoxPlot.pdf", plot = plot1, width = 10, height = 6, units = "in")
+# ggsave("resfinder_rpkmPlot_groups.pdf", plot = rpkm_plot_groups, width = 10, height = 6, units = "in")
 
 # Shannon Index (Tribe)----
 
@@ -149,15 +154,16 @@ shannon_index_df$tribe <- factor(shannon_index_df$tribe,
                                  levels = c("Jahai", "Temiar", "Temuan", "Malay"))
 
 # Create the boxplot
-boxplot <- ggplot(shannon_index_df, aes(x = tribe, y = Shannon_Index, fill = tribe)) +
-  geom_boxplot(outlier.shape = NA) +
-  labs(title = "Shannon Index Distribution by Group",
-       x = "Group",
-       y = "Shannon Index",
-       fill = "Group") +
+shannon_plot_groups <- ggplot(shannon_index_df, aes(x = tribe, y = Shannon_Index, fill = tribe)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.05, fill = "white", outlier.shape = NA) +
+  # geom_boxplot(outlier.shape = NA) +
+  labs(x = "Groups",
+       y = "ARG Diversity (Shannon Index)",
+       fill = "Groups") +
   scale_fill_manual(values = c("Jahai" = "darkgreen", "Temiar" = "skyblue",
                                "Temuan" = "orange", "Malay" = "pink")) +
-  geom_jitter(width = 0.2, color = "blue") +
+  # geom_jitter(width = 0.2, color = "blue") +
   theme_classic() +
   theme(axis.text.x = element_text()) +
   ggsignif::geom_signif(
@@ -165,17 +171,15 @@ boxplot <- ggplot(shannon_index_df, aes(x = tribe, y = Shannon_Index, fill = tri
     annotations = "p = 0.042",
     map_signif_level = TRUE,
     textsize = 3.5,
-    y_position = c(3, 3.2)
-  ) +
-  annotate("text", x = 1.5, y = 3.5, 
-           label = "ANOVA: p = 0.0402", size = 4, color = "red")
-boxplot
+    y_position = c(4.3, 3.2)
+  )
+shannon_plot_groups
 
 # Save as PNG
-# ggsave("resfinder_plot2_shannonBoxPlot_revised.png", plot = boxplot, width = 10, height = 6, units = "in")
+# ggsave("resfinder_shannonPlot_groups.png", plot = shannon_plot_groups, width = 10, height = 6, units = "in")
 
 # Save as PDF
-# ggsave("resfinder_plot2_shannonBoxPlot_revised.pdf", plot = boxplot, width = 10, height = 6, units = "in")
+# ggsave("resfinder_shannonPlot_groups.pdf", plot = shannon_plot_groups, width = 10, height = 6, units = "in")
 
 # Distribution (Region Group) ----
 
@@ -191,37 +195,30 @@ for (Group.Bi in unique(kma_out$Group.Bi)) {
 wilcox_result <- wilcox.test(RPKM ~ Group.Bi, data = kma_out)
 wilcox_result
 
-# keep value for visualization
-wilcox_W <- wilcox_result$statistic
-wilcox_p <- wilcox_result$p.value
-
 # visualization
-rpkm_boxPlot_Group <- ggplot(kma_out, aes(x = Group.Bi, y = RPKM, fill = Group.Bi)) +
-  geom_boxplot() +
+rpkm_plot_Region <- ggplot(kma_out, aes(x = Group.Bi, y = RPKM, fill = Group.Bi)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.05, fill = "white", outlier.shape = NA) +
   scale_y_log10() +
   theme_classic() +
+  ggsignif::geom_signif(
+    comparisons = list(c("Urban", "Rural")),
+    annotations = "p = 0.02707",
+    map_signif_level = TRUE,
+    textsize = 3.5,
+    y_position = 6.5) +
   scale_fill_manual(values = c("Rural" = "darkgreen", "Urban"= "pink")) +
   theme(axis.text.x = element_text()) +
-  labs(title = "Boxplot of RPKM (log scale) by Region Group", 
-       y = "RPKM (log scale)", 
-       x = "Region Group",
-       fill = "Region Group")
-rpkm_boxPlot_Group
-
-rpkm_boxPlot_Group_v2 <- rpkm_boxPlot_Group + 
-  annotate("text", x = 1.2, y = 1e06, 
-           label = paste0("Wilcoxon rank-sum test\n",
-                          "W = ", wilcox_W,
-                          "\n",
-                          "p = ", formatC(wilcox_p, format = "e", digits = 2)),
-           hjust = 0, vjust = 1.5, size = 3.2, color = "red")
-rpkm_boxPlot_Group_v2
+  labs(x = "Region Groups",
+       y = "ARG Load (Log scaled RPKM)", 
+       fill = "Region Groups")
+rpkm_plot_Region
 
 # Save as PNG
-# ggsave("resfinder_plot3_distributionBoxPlot_regionGroup.png", plot = rpkm_boxPlot_Group_v2, width = 10, height = 6, units = "in")
+# ggsave("resfinder_rpkmPlot_Region.png", plot = rpkm_plot_Region, width = 10, height = 6, units = "in")
 
 # Save as PDF
-# ggsave("resfinder_plot3_distributionBoxPlot_regionGroup.pdf", plot = rpkm_boxPlot_Group_v2, width = 10, height = 6, units = "in")
+# ggsave("resfinder_rpkmPlot_Region.pdf", plot = rpkm_plot_Region, width = 10, height = 6, units = "in")
 
 # Shannon Index (Region Group)----
 
@@ -282,7 +279,7 @@ shannon_index_df <- shannon_index_df %>%
 # shapiro test
 for (group in unique(shannon_index_df$Group.Bi)) {
   Group.Bi_data <- shannon_index_df$Shannon_Index[shannon_index_df$Group.Bi == group]
-  cat("Shapiro-Wilk test for Shannon Index in", Group.Bi, ":\n")
+  cat("Shapiro-Wilk test for Shannon Index in", group, ":\n")
   print(shapiro.test(Group.Bi_data))
   cat("\n")
 }
@@ -296,27 +293,25 @@ p_val <- signif(t_test$p.value, 3)
 
 # visualization
 set.seed(888) # keep jitter same
-shannon_boxPlot_Group <- ggplot(shannon_index_df, aes(x = Group.Bi, y = Shannon_Index, fill = Group.Bi)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(width = 0.2, color = "blue") +
+shannon_plot_Region <- ggplot(shannon_index_df, aes(x = Group.Bi, y = Shannon_Index, fill = Group.Bi)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.05, fill = "white", outlier.size = 0.5) +
   theme_classic() +
+  ggsignif::geom_signif(
+    comparisons = list(c("Urban", "Rural")),
+    annotations = p_val,
+    map_signif_level = TRUE,
+    textsize = 3.5,
+    y_position = 4.25) +
   scale_fill_manual(values = c("Rural" = "darkgreen", "Urban"= "pink")) +
   theme(axis.text.x = element_text()) +
-  labs(title = "Boxplot of Shannon Index by Region Group", 
-       y = "Shannon Index", 
-       x = "Region Group",
-       fill = "Region Group")
-shannon_boxPlot_Group
-
-set.seed(888) # keep jitter same
-shannon_boxPlot_Group_v2 <- shannon_boxPlot_Group + 
-  annotate("text", x = 1.5, y = 3, 
-           label = paste("t-test, p =", p_val), 
-           size = 4, color = "red")
-shannon_boxPlot_Group_v2
+  labs(x = "Region Groups",
+       y = "ARG Diversity (Shannon Index)", 
+       fill = "Region Groups")
+shannon_plot_Region
 
 # Save as PNG
-# ggsave("resfinder_plot4_shannonBoxPlot.png", plot = shannon_boxPlot_Group_v2, width = 10, height = 6, units = "in")
+# ggsave("resfinder_shannonPlot_Region.png", plot = shannon_plot_Region, width = 10, height = 6, units = "in")
 
 # Save as PDF
-# ggsave("resfinder_plot4_shannonBoxPlot.pdf", plot = shannon_boxPlot_Group_v2, width = 10, height = 6, units = "in")
+# ggsave("resfinder_shannonPlot_Region.pdf", plot = shannon_plot_Region, width = 10, height = 6, units = "in")
