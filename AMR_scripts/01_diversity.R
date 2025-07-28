@@ -10,6 +10,7 @@ library(ggsignif)
 library(vegan)
 library(dunn.test)
 library(ggpubr)
+library(scales)
 
 # import data
 kma_out <- read.csv("kma_out.csv", check.names = FALSE)
@@ -60,14 +61,21 @@ rpkm_plot_groups <- ggplot(kma_out, aes(x = tribe, y = RPKM, fill = tribe)) +
   geom_violin(trim = FALSE) +
   geom_boxplot(width = 0.1, fill = "white") +
   # geom_jitter(width = 0.2, alpha = 0.7, size = 1.5) +
-  scale_y_log10() +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
   theme_classic() +
+  theme(legend.position = "none",
+        plot.title = element_text(
+          face = "bold",
+          size = 15)) +
   scale_fill_manual(values = c("Jahai" = "darkgreen", "Temiar" = "skyblue",
                                "Temuan" = "orange", "Malay" = "pink")) +
   theme(axis.text.x = element_text()) +
-  labs(x = "Group",
-       y = "ARG Load (Log scaled RPKM)", 
-       fill = "Groups") +
+  labs(title = "A",
+       x = NULL,
+       y = "ARG Load (Log scaled RPKM)" 
+       # fill = "Groups",
+       ) +
   ggsignif::geom_signif(
     comparisons = list(c("Temiar", "Temuan"),
                        c("Jahai", "Temiar"),
@@ -157,15 +165,19 @@ shannon_index_df$tribe <- factor(shannon_index_df$tribe,
 shannon_plot_groups <- ggplot(shannon_index_df, aes(x = tribe, y = Shannon_Index, fill = tribe)) +
   geom_violin(trim = FALSE) +
   geom_boxplot(width = 0.05, fill = "white", outlier.shape = NA) +
-  # geom_boxplot(outlier.shape = NA) +
-  labs(x = "Groups",
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.title = element_text(
+          face = "bold",
+          size = 15)
+        ) +
+  labs(title = "B",
+       x = NULL,
        y = "ARG Diversity (Shannon Index)",
-       fill = "Groups") +
+       # fill = "Groups"
+       ) +
   scale_fill_manual(values = c("Jahai" = "darkgreen", "Temiar" = "skyblue",
                                "Temuan" = "orange", "Malay" = "pink")) +
-  # geom_jitter(width = 0.2, color = "blue") +
-  theme_classic() +
-  theme(axis.text.x = element_text()) +
   ggsignif::geom_signif(
     comparisons = list(c("Jahai", "Temuan")),
     annotations = "p = 0.042",
@@ -195,23 +207,32 @@ for (Group.Bi in unique(kma_out$Group.Bi)) {
 wilcox_result <- wilcox.test(RPKM ~ Group.Bi, data = kma_out)
 wilcox_result
 
+# adjust sequence for plot
+kma_out$Group.Bi <- factor(kma_out$Group.Bi, levels = c("Rural", "Urban"))
+
 # visualization
 rpkm_plot_Region <- ggplot(kma_out, aes(x = Group.Bi, y = RPKM, fill = Group.Bi)) +
   geom_violin(trim = FALSE) +
   geom_boxplot(width = 0.05, fill = "white", outlier.shape = NA) +
-  scale_y_log10() +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
   theme_classic() +
+  theme(legend.position = "none",
+        plot.title = element_text(
+          face = "bold",
+          size = 15)) +
+  labs(title = "C",
+       x = NULL,
+       y = "ARG Load (Log scaled RPKM)" 
+       # fill = "Region Groups"
+       ) +
   ggsignif::geom_signif(
     comparisons = list(c("Urban", "Rural")),
     annotations = "p = 0.02707",
     map_signif_level = TRUE,
     textsize = 3.5,
     y_position = 6.5) +
-  scale_fill_manual(values = c("Rural" = "darkgreen", "Urban"= "pink")) +
-  theme(axis.text.x = element_text()) +
-  labs(x = "Region Groups",
-       y = "ARG Load (Log scaled RPKM)", 
-       fill = "Region Groups")
+  scale_fill_manual(values = c("Rural" = "darkgreen", "Urban"= "pink"))
 rpkm_plot_Region
 
 # Save as PNG
@@ -291,23 +312,30 @@ t_test
 # save value for viz
 p_val <- signif(t_test$p.value, 3)
 
+# adjust sequence for plot
+shannon_index_df$Group.Bi <- factor(shannon_index_df$Group.Bi, levels = c("Rural", "Urban"))
+
 # visualization
-set.seed(888) # keep jitter same
 shannon_plot_Region <- ggplot(shannon_index_df, aes(x = Group.Bi, y = Shannon_Index, fill = Group.Bi)) +
   geom_violin(trim = FALSE) +
   geom_boxplot(width = 0.05, fill = "white", outlier.size = 0.5) +
   theme_classic() +
+  theme(legend.position = "none",
+        plot.title = element_text(
+          face = "bold",
+          size = 15)) +
+  labs(title = "D",
+       x = NULL,
+       y = "ARG Diversity (Shannon Index)" 
+       # fill = "Region Groups"
+  ) +
   ggsignif::geom_signif(
     comparisons = list(c("Urban", "Rural")),
     annotations = p_val,
     map_signif_level = TRUE,
     textsize = 3.5,
     y_position = 4.25) +
-  scale_fill_manual(values = c("Rural" = "darkgreen", "Urban"= "pink")) +
-  theme(axis.text.x = element_text()) +
-  labs(x = "Region Groups",
-       y = "ARG Diversity (Shannon Index)", 
-       fill = "Region Groups")
+  scale_fill_manual(values = c("Rural" = "darkgreen", "Urban"= "pink"))
 shannon_plot_Region
 
 # Save as PNG
