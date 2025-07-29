@@ -1,9 +1,10 @@
 # Ignore hidden file tracker in MacOS
-.DS_Store
+*.DS_Store
 
 # Ignore data and metadata
 *.csv
 *.xlsx
 
-# Ignore Rhistory
-.Rhistory
+# Ignore Rhistory, RData
+*.Rhistory
+*.RData
