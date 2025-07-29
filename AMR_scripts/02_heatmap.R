@@ -185,7 +185,7 @@ tribes_legend <- Legend(
 # Heatmap and Export ----
 
 # Uncomment the next line to export the plot
-png("resfinder_ARGheatmap.png", width = 10, height = 8, units = "in", res = 1200)
+# png("resfinder_ARGheatmap.png", width = 10, height = 8, units = "in", res = 300)
 
 # Uncomment the next line to export the plot as pdf
 # pdf("resfinder_ARGheatmap.pdf", width = 10, height = 8)
@@ -227,5 +227,5 @@ draw(Heatmap(heatmap_matrix_log_T,
 )
 
 # Uncomment the next line if exporting
-dev.off()
+# dev.off()
 

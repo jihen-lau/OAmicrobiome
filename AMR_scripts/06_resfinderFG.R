@@ -219,10 +219,10 @@ colors <- c("white", color_gradient)
 col_fun <- colorRamp2(breaks, colors)
 
 # Uncomment the next line to export the plot
-# png("resfinderFG_heatmap.png", width = 10, height = 8, units = "in", res = 1200)
+# png("resfinderFG_heatmap.png", width = 10, height = 8, units = "in", res = 300)
 
 # Uncomment the next line to export the plot as pdf
-# pdf("resfinderFG_heatmap.pdf", width = 10, height = 8)
+pdf("resfinderFG_heatmap.pdf", width = 10, height = 8)
 
 # Heatmap
 draw(Heatmap(heatmap_matrix_log_T,
@@ -258,4 +258,4 @@ draw(Heatmap(heatmap_matrix_log_T,
 )
 
 # Uncomment the next line if exporting
-# dev.off()
+dev.off()

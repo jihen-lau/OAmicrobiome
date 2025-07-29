@@ -23,11 +23,16 @@ gene_list <- kma_out %>%
 gene_df <- fromList(gene_list)
 
 # plot
-pdf("resfinder_plot5_upsetPlot.pdf", width = 14, height = 10)
+# Save as pdf
+# pdf("resfinder_upsetPlot.pdf", width = 14, height = 10)
+
+# Uncomment the next line to export the plot
+png("resfinder_upsetPlot.png", width = 10, height = 5, units = "in", res = 300)
+
 upset(gene_df, nsets = 4, point.size = 4, text.scale = 1.8, 
       sets = c("Jahai", "Temiar", "Temuan", "Malay"), 
       keep.order = TRUE, order.by = "freq",
-      mainbar.y.label = "Number of AMR Genes in\nSet Intersections", 
-      sets.x.label = "Number of AMR Genes")
-grid::grid.text("AMR Gene Distribution Across Groups", x = 0.6, y = 0.95, gp = grid::gpar(fontsize = 16))
+      mainbar.y.label = "Number of ARGs in\nSet Intersections", 
+      sets.x.label = "Number of ARGs")
+
 dev.off()
