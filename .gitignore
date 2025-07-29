@@ -3,6 +3,7 @@
 
 # Ignore data and metadata
 *.csv
+*.xlsx
 
 # Ignore Rhistory
 .Rhistory
