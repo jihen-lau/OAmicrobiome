@@ -193,10 +193,32 @@ tribes <- c(
   rep("Malay", 9) 
 )
 
+# # Column annotation for tribes
+# column_anno <- HeatmapAnnotation(
+#   foo = anno_empty(border = FALSE), # add space for degree of urbanisation
+#   Tribes = tribes,
+#   col = list(Tribes = c("Jahai" = "darkgreen",
+#                         "Temiar" = "skyblue",
+#                         "Temuan" = "orange",
+#                         "Malay" = "pink")),
+#   show_annotation_name = FALSE,
+#   show_legend = FALSE
+# )
+
+# One label per tribe
+tribe_labels <- c("Jahai", "Temiar", "Temuan", "Malay")
+
+# One fill per tribe
+tribe_colors <- c("darkgreen", "skyblue", "orange", "pink")
+
 # Column annotation for tribes
 column_anno <- HeatmapAnnotation(
   foo = anno_empty(border = FALSE), # add space for degree of urbanisation
-  Tribes = tribes,
+  Tribes = anno_block(
+    gp = gpar(fill = tribe_colors, col = NA),
+    labels = tribe_labels,
+    labels_gp = gpar(col = "white", fontsize = 12, fontface = "bold"),
+  ),
   col = list(Tribes = c("Jahai" = "darkgreen",
                         "Temiar" = "skyblue",
                         "Temuan" = "orange",
@@ -204,6 +226,7 @@ column_anno <- HeatmapAnnotation(
   show_annotation_name = FALSE,
   show_legend = FALSE
 )
+
 
 # Create custom legends
 tribes_legend <- Legend(
@@ -222,7 +245,7 @@ col_fun <- colorRamp2(breaks, colors)
 # png("resfinderFG_heatmap.png", width = 10, height = 8, units = "in", res = 300)
 
 # Uncomment the next line to export the plot as pdf
-pdf("resfinderFG_heatmap.pdf", width = 10, height = 8)
+# pdf("resfinderFG_heatmap.pdf", width = 10, height = 8)
 
 # Heatmap
 draw(Heatmap(heatmap_matrix_log_T,
@@ -253,9 +276,10 @@ draw(Heatmap(heatmap_matrix_log_T,
                          gp = gpar(col = "black", lwd = 0.5, fill = NA))
              }),
      # Add custom legends
-     annotation_legend_list = list(tribes_legend),
-     merge_legends = TRUE
+     # annotation_legend_list = list(tribes_legend),
+     # merge_legends = TRUE
+     heatmap_legend_side = "bottom"
 )
 
 # Uncomment the next line if exporting
-dev.off()
+# dev.off()
