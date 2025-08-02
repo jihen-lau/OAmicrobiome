@@ -60,21 +60,19 @@ kma_out$tribe <- factor(kma_out$tribe, levels = c("Jahai", "Temiar", "Temuan", "
 rpkm_plot_groups <- ggplot(kma_out, aes(x = tribe, y = RPKM, fill = tribe)) +
   geom_violin(trim = FALSE) +
   geom_boxplot(width = 0.1, fill = "white") +
-  # geom_jitter(width = 0.2, alpha = 0.7, size = 1.5) +
   scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
                 labels = trans_format("log10", math_format(10^.x))) +
-  theme_classic() +
+  theme_classic(base_family = "sans") +
   theme(legend.position = "none",
         plot.title = element_text(
           face = "bold",
-          size = 15)) +
+          size = 15),
+        text = element_text(size = 16)) +
   scale_fill_manual(values = c("Jahai" = "darkgreen", "Temiar" = "skyblue",
                                "Temuan" = "orange", "Malay" = "pink")) +
-  theme(axis.text.x = element_text()) +
   labs(title = "A",
        x = NULL,
        y = "ARG Load (Log scaled RPKM)" 
-       # fill = "Groups",
        ) +
   ggsignif::geom_signif(
     comparisons = list(c("Temiar", "Temuan"),
@@ -84,7 +82,7 @@ rpkm_plot_groups <- ggplot(kma_out, aes(x = tribe, y = RPKM, fill = tribe)) +
     annotations = c("p = 3.0484e-05",
                     "p = 1.8472e-04",
                     "p = 1.6855e-03"),
-    textsize = 3,
+    textsize = 4,
     y_position = c(7, 6.5, 6.5)
   )
 rpkm_plot_groups
@@ -165,16 +163,15 @@ shannon_index_df$tribe <- factor(shannon_index_df$tribe,
 shannon_plot_groups <- ggplot(shannon_index_df, aes(x = tribe, y = Shannon_Index, fill = tribe)) +
   geom_violin(trim = FALSE) +
   geom_boxplot(width = 0.05, fill = "white", outlier.shape = NA) +
-  theme_classic() +
+  theme_classic(base_family = "sans") +
   theme(legend.position = "none",
         plot.title = element_text(
           face = "bold",
-          size = 15)
-        ) +
+          size = 15),
+        text = element_text(size = 16)) +
   labs(title = "B",
        x = NULL,
        y = "ARG Diversity (Shannon Index)",
-       # fill = "Groups"
        ) +
   scale_fill_manual(values = c("Jahai" = "darkgreen", "Temiar" = "skyblue",
                                "Temuan" = "orange", "Malay" = "pink")) +
@@ -182,7 +179,7 @@ shannon_plot_groups <- ggplot(shannon_index_df, aes(x = tribe, y = Shannon_Index
     comparisons = list(c("Jahai", "Temuan")),
     annotations = "p = 0.042",
     map_signif_level = TRUE,
-    textsize = 3.5,
+    textsize = 4,
     y_position = c(4.3, 3.2)
   )
 shannon_plot_groups
@@ -216,11 +213,12 @@ rpkm_plot_Region <- ggplot(kma_out, aes(x = Group.Bi, y = RPKM, fill = Group.Bi)
   geom_boxplot(width = 0.05, fill = "white", outlier.shape = NA) +
   scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
                 labels = trans_format("log10", math_format(10^.x))) +
-  theme_classic() +
+  theme_classic(base_family = "sans") +
   theme(legend.position = "none",
         plot.title = element_text(
           face = "bold",
-          size = 15)) +
+          size = 15),
+        text = element_text(size = 16)) +
   labs(title = "C",
        x = NULL,
        y = "ARG Load (Log scaled RPKM)" 
@@ -230,7 +228,7 @@ rpkm_plot_Region <- ggplot(kma_out, aes(x = Group.Bi, y = RPKM, fill = Group.Bi)
     comparisons = list(c("Urban", "Rural")),
     annotations = "p = 0.02707",
     map_signif_level = TRUE,
-    textsize = 3.5,
+    textsize = 4,
     y_position = 6.5) +
   scale_fill_manual(values = c("Rural" = "darkgreen", "Urban"= "pink"))
 rpkm_plot_Region
@@ -319,11 +317,12 @@ shannon_index_df$Group.Bi <- factor(shannon_index_df$Group.Bi, levels = c("Rural
 shannon_plot_Region <- ggplot(shannon_index_df, aes(x = Group.Bi, y = Shannon_Index, fill = Group.Bi)) +
   geom_violin(trim = FALSE) +
   geom_boxplot(width = 0.05, fill = "white", outlier.size = 0.5) +
-  theme_classic() +
+  theme_classic(base_family = "sans") +
   theme(legend.position = "none",
         plot.title = element_text(
           face = "bold",
-          size = 15)) +
+          size = 15),
+        text = element_text(size = 16)) +
   labs(title = "D",
        x = NULL,
        y = "ARG Diversity (Shannon Index)" 
@@ -333,7 +332,7 @@ shannon_plot_Region <- ggplot(shannon_index_df, aes(x = Group.Bi, y = Shannon_In
     comparisons = list(c("Urban", "Rural")),
     annotations = p_val,
     map_signif_level = TRUE,
-    textsize = 3.5,
+    textsize = 4,
     y_position = 4.25) +
   scale_fill_manual(values = c("Rural" = "darkgreen", "Urban"= "pink"))
 shannon_plot_Region
