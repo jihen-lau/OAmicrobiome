@@ -27,7 +27,7 @@ gene_df <- fromList(gene_list)
 # pdf("resfinder_upsetPlot.pdf", width = 14, height = 10)
 
 # Uncomment the next line to export the plot
-png("resfinder_upsetPlot.png", width = 10, height = 5, units = "in", res = 300)
+# png("resfinder_upsetPlot.png", width = 10, height = 5, units = "in", res = 300)
 
 upset(gene_df, nsets = 4, point.size = 4, text.scale = 1.8, 
       sets = c("Jahai", "Temiar", "Temuan", "Malay"), 
@@ -35,4 +35,4 @@ upset(gene_df, nsets = 4, point.size = 4, text.scale = 1.8,
       mainbar.y.label = "Number of ARGs in\nSet Intersections", 
       sets.x.label = "Number of ARGs")
 
-dev.off()
+# dev.off()
