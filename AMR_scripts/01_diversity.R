@@ -47,7 +47,7 @@ kruskal_chisq <- kruskal_result$statistic
 kruskal_pvalue <- kruskal_result$p.value
 
 # dunn test
-dunn_test_result <- dunn.test(kma_out$RPKM, kma_out$tribe, method = "bonferroni")
+dunn_test_result <- dunn.test(kma_out$RPKM, kma_out$tribe, method = "none")
 data.frame(
   comparison = dunn_test_result$comparisons,
   p_value = dunn_test_result$P.adjusted
@@ -79,9 +79,9 @@ rpkm_plot_groups <- ggplot(kma_out, aes(x = tribe, y = RPKM, fill = tribe)) +
                        c("Jahai", "Temiar"),
                        c("Temiar", "Malay")),
     map_signif_level = TRUE,
-    annotations = c("p = 3.0484e-05",
-                    "p = 1.8472e-04",
-                    "p = 1.6855e-03"),
+    annotations = c("p = 5.0806e-06",
+                    "p = 3.0786e-05",
+                    "p = 2.8091e-04"),
     textsize = 4,
     y_position = c(7, 6.5, 6.5)
   )
@@ -148,12 +148,27 @@ for (tribe in unique(shannon_index_df$tribe)) {
   cat("\n")
 }
 
-# Perform one-way ANOVA
-anova_result <- aov(Shannon_Index ~ tribe, data = shannon_index_df)
-summary(anova_result)
+# # Perform one-way ANOVA
+# anova_result <- aov(Shannon_Index ~ tribe, data = shannon_index_df)
+# summary(anova_result)
+# 
+# # adhoc test
+# TukeyHSD(anova_result)
 
-# adhoc test
-TukeyHSD(anova_result)
+# use Kruskal Wallis for standardization
+## statistical test
+kruskal_result <- kruskal.test(Shannon_Index ~ tribe, data = shannon_index_df)
+
+# Extracting the chi-squared statistic and p-value
+kruskal_chisq <- kruskal_result$statistic
+kruskal_pvalue <- kruskal_result$p.value
+
+# pairwise comparison
+dunn_test_result <- dunn.test(shannon_index_df$Shannon_Index, shannon_index_df$tribe, method = "none")
+data.frame(
+  comparison = dunn_test_result$comparisons,
+  p_value = dunn_test_result$P.adjusted
+)
 
 # re-arrange tribe according to least urban to most urban
 shannon_index_df$tribe <- factor(shannon_index_df$tribe,
@@ -176,11 +191,13 @@ shannon_plot_groups <- ggplot(shannon_index_df, aes(x = tribe, y = Shannon_Index
   scale_fill_manual(values = c("Jahai" = "darkgreen", "Temiar" = "skyblue",
                                "Temuan" = "orange", "Malay" = "pink")) +
   ggsignif::geom_signif(
-    comparisons = list(c("Jahai", "Temuan")),
-    annotations = "p = 0.042",
+    comparisons = list(c("Jahai", "Temuan"),
+                       c("Jahai", "Malay")),
+    annotations = c("p = 0.0023",
+                    "p = 0.0088"),
     map_signif_level = TRUE,
     textsize = 4,
-    y_position = c(4.3, 3.2)
+    y_position = c(4.3, 4.5)
   )
 shannon_plot_groups
 
@@ -222,7 +239,6 @@ rpkm_plot_Region <- ggplot(kma_out, aes(x = Group.Bi, y = RPKM, fill = Group.Bi)
   labs(title = "C",
        x = NULL,
        y = "ARG Load (Log scaled RPKM)" 
-       # fill = "Region Groups"
        ) +
   ggsignif::geom_signif(
     comparisons = list(c("Urban", "Rural")),
@@ -303,12 +319,13 @@ for (group in unique(shannon_index_df$Group.Bi)) {
   cat("\n")
 }
 
-# perform t test since Shannon index passed normal dist
-t_test <- t.test(Shannon_Index ~ Group.Bi, data = shannon_index_df)
-t_test
+# # perform t test since Shannon index passed normal dist
+# t_test <- t.test(Shannon_Index ~ Group.Bi, data = shannon_index_df)
+# t_test
 
-# save value for viz
-p_val <- signif(t_test$p.value, 3)
+# perform wilcoxon test since not normal dist
+wilcox_result <- wilcox.test(Shannon_Index ~ Group.Bi, data = shannon_index_df)
+wilcox_result
 
 # adjust sequence for plot
 shannon_index_df$Group.Bi <- factor(shannon_index_df$Group.Bi, levels = c("Rural", "Urban"))
@@ -326,11 +343,10 @@ shannon_plot_Region <- ggplot(shannon_index_df, aes(x = Group.Bi, y = Shannon_In
   labs(title = "D",
        x = NULL,
        y = "ARG Diversity (Shannon Index)" 
-       # fill = "Region Groups"
   ) +
   ggsignif::geom_signif(
     comparisons = list(c("Urban", "Rural")),
-    annotations = p_val,
+    annotations = "p = 0.002598",
     map_signif_level = TRUE,
     textsize = 4,
     y_position = 4.25) +
