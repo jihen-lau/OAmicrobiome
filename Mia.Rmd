@@ -1,7 +1,7 @@
 ---
 title: "OA-microbiome"
 author: "Li-Fang Yeo"
-date: "07 June 2025"
+date: "21st Nov 2025"
 output: html_document
 ---
 
@@ -16,20 +16,13 @@ library(dplyr)
 library(knitr)
 library(miaViz)
 library(stringr)
-library(boot)
+library(maaslin3)
+library(tableone)
+library(ggsignif)
 ```
-Data input 
 ```{r}
-meta <- read.csv("Metafile.csv", row.names = 1, header = TRUE)
-#meta <- meta %>% mutate(Group = str_replace_all(Group,"Temiar", "A"))
-tse <- importMetaPhlAn("data/42_abund_fixed.txt", assay.type = "relabundance", col.data = meta, removeTaxaPrefixes = TRUE)
-
-#functions to make my life easier
-tse_meta <- function(x, rownames = TRUE) {
-  { if (inherits(x, "TreeSummarizedExperiment")) SummarizedExperiment::colData(x) else x } %>%
-    { if(rownames) tibble::as_tibble(., rownames = "rownames") else tibble::as_tibble(.) }
-}
-
+#function to make my life easier
+#This function works like dplyr::mutate
 tse_mutate <- function(.data, ...) {
   dots <- rlang::enquos(...)
   new_data <-  tse_meta(.data) %>%
@@ -39,11 +32,21 @@ tse_mutate <- function(.data, ...) {
   SummarizedExperiment::colData(.data) <- new_data
   .data
 }
+#this function is needed for tse_mutate to work
+tse_meta <- function(x, rownames = TRUE) {
+  { if (inherits(x, "TreeSummarizedExperiment")) SummarizedExperiment::colData(x) else x } %>%
+    { if(rownames) tibble::as_tibble(., rownames = "rownames") else tibble::as_tibble(.) }
+}
+```
 
+Data input 
+```{r}
+meta <- read.csv("Metafile.csv", row.names = 1, header = TRUE)
+#meta <- meta %>% mutate(Group = str_replace_all(Group,"Temiar", "A"))
+tse <- importMetaPhlAn("data/42_abund_fixed.txt", assay.type = "relabundance", col.data = meta, removeTaxaPrefixes = TRUE)
 tse <- tse %>% tse_mutate(dplyr::across(c(Group.Bi), as.factor))
 ```
 ```{r}
-library(tableone)
 myVars <- c("Age", "Systolic", "Diastolic", "BMI.1", "WaistCirc", "HbA1C.1",
           "H.pylori","Gender", "Smoke", "BMI", "HbA1C","Group")
 ## Vector of categorical variables that need transformation
@@ -56,27 +59,19 @@ write.csv(tab, "tableone.csv")
 ```{r}
 #agglomerate data
 x1 <- altExp(tse, "species")
-#Top10
-my_colors <- c("Jahai" = "darkgreen", "Temiar" = "skyblue", "Temuan" = "orange", "Malay" = "pink" )
-plotAbundanceDensity(x1, layout = "density", assay_name = "relabundance",
-                     n = 10, colour_by="Group", point_alpha=0.5) + scale_x_log10(label = scales::label_number()) +
-  scale_fill_manual(values = my_colors)
-```
-```{r}
-#Abundance
-plotAbundanceDensity(x1, layout = "jitter", assay.type = "relabundance",
-                     n = 20, point_size=1, point_shape=19, point_alpha=0.1, order_descending = TRUE) +
-  scale_x_log10(label = scales::percent)
+
+my_colors <- c("Malay"="darkkhaki", "Temuan"="#8eb79c","Temiar"= "#4b705c","Jahai" = "black")
+
 ```
 Alpha diversity 
 ```{r}
 library(scater)
 library(patchwork)
 library(ggsignif)
-x1 <- mia::estimateDiversity(x1, 
+x1 <- mia::addAlpha(x1, 
                               assay.type = "relabundance",
-                              index = "shannon", 
-                              name = "shannon", )
+                              index = "shannon_diversity", 
+                              name = "shannon")
 df<- as.data.frame(colData(x1))
 #change level
 df$Group <- factor(df$Group, levels = c("Jahai", "Temiar", "Temuan", "Malay"))
@@ -84,43 +79,44 @@ df$Group <- factor(df$Group, levels = c("Jahai", "Temiar", "Temuan", "Malay"))
 comb <- split(t(combn(levels(df$Group), 2)), 
            seq(nrow(t(combn(levels(df$Group), 2)))))
 
-pdf("alpha.pdf")
-ggplot(df, aes(x = Group, y = shannon, fill = Group)) +
+p<- ggplot(df, aes(x = Group, y = shannon, fill = Group)) +
   # Outliers are removed, because otherwise each 
   # data point would be plotted twice; 
   # as an outlier of boxplot and as a point of dotplot.
   geom_boxplot(outlier.shape = NA) + 
   geom_jitter(width = 0.2) + 
-  geom_signif(comparisons = comb, map_signif_level = FALSE,
+  geom_signif(comparisons = comb, test = "wilcox.test", map_signif_level = FALSE,
               correction="fdr", step_increase = 0.1) + #Corrects the p-values and step increase minimise overlap
   theme(text = element_text(size = 6)) + theme_classic() +
   scale_fill_manual(values = my_colors)
-alpha
-
+ggsave("alpha.pdf",
+       p, 
+       width = 8,
+       height = 6,
+       units = "in")
 ```
 Beta diversity
 ```{r}
 x1 <- runRDA(x1,
                assay.type = "relabundance",
-               formula = assay ~ Group,
+               formula = assay ~ Group + Reads,
                distance = "bray",
                na.action = na.exclude)
 
-x1 <- addRDA(x1,
-               assay.type = "relabundance",
-               formula = assay ~ Group,
-               distance = "bray",
-               na.action = na.exclude)
 # Store results of PERMANOVA test
 rda_info <- attr(reducedDim(x1, "RDA"), "significance")
 ```
 ```{r}
 rda_info$permanova |>
   knitr::kable()
+
+write.csv(rda_info$permanova, "permanova.csv")
 ```
 ```{r}
 rda_info$homogeneity |>
   knitr::kable()
+
+write.csv(rda_info$homogeneity, "homogeneity.csv")
 ```
 ```{r}
 #dbRDA plot
@@ -136,9 +132,15 @@ ggsave("RDA.pdf",
 ```
 ```{r}
 #plot dbRDA loadings
-L<- miaViz::plotLoadings(x1, "RDA", ncomponents = 2, n = 10)
+L <- miaViz::plotLoadings(x1, "RDA", ncomponents = 2, n = 10)
 
+L<- L + scale_fill_manual(name = "Effect", 
+                          values = c("blue", "maroon"),
+                          labels = c('Negative', 'Positive'))
+
+L
 library(patchwork)
+p / L
 onni <- p / L
 ggsave("RDA-loadings.pdf",
        onni, 
@@ -149,99 +151,94 @@ ggsave("RDA-loadings.pdf",
 
 Differential abundance analysis
 ```{r}
-# Load package
-library(ANCOMBC)
-# ANCOM-BC2
-tse_species_BC <- mia::subsetByPrevalentFeatures(tse, rank = "species",
-                                              detection = 0.1/100,
-                                              prevalence = 5/100,
-                                              as_relative = TRUE,
-                                              assay.type = "relabundance")
+tse3 <- tse %>% 
+  mia::agglomerateByRank(rank = "species") %>%
+  mia::agglomerateByPrevalence(assay.type = "relabundance",
+                               detection =  0.1/100,
+                               prevalence = 5/100)
+  
+
+maaslin3_out <- maaslin3(
+  input_data = tse3,
+  output = "DAA_taxa",
+  formula = " ~ Group + Reads",
+  normalization = "CLR",
+  transform = "NONE",
+  verbosity = "ERROR",
+  standardize = "TRUE",
+  reference = "Group,Malay",
+  warn_prevalence = "FALSE",
+  max_significance = 0.05,
+  correction = "BH",
+  plot_summary_plot = TRUE,
+  plot_associations = FALSE
+)
 ```
+## Predicted pathway analysis
 ```{r}
-pcol <- glue::glue("q_Group.Bi")
+pw <- read_delim("data/subset_pathabundance-cpm.tsv", 
+     delim = "\t", escape_double = FALSE, 
+     trim_ws = TRUE)
 ```
+Clean up
 ```{r}
-ancombc2_species <- ANCOMBC::ancombc2(data = tse_species_BC,
-            fix_formula = "Group.Bi",
-                         assay_name = "relabundance",
-                         p_adj_method = "BH",
-                         verbose = TRUE,
-                         neg_lb = TRUE,
-            mdfdr_control = list(fwer_ctrl_method = "BH", B = 100))
+colnames(pw) <- gsub("HFJYKBBXY_", "", colnames(pw))
+colnames(pw) <- gsub("HHCNCBBXY_", "", colnames(pw))
+colnames(pw) <- gsub("_.*", "", colnames(pw))
+pw <- pw %>% rename("Pathway"  = "# Pathway")
+
+#discrepancy between sampleID
+pw <- pw %>% dplyr::rename(TM0123M = TM123M) %>%
+            dplyr::rename(TM0167F = TM167F) %>%
+            dplyr::rename(TM0169M = TM169M)
+#Filter pathway abundance table first
+abund_table <- pw %>% 
+  filter(rowSums(across(where(is.numeric)))!=0) %>%
+  #grep all Pathways that end with species
+  filter(!grepl('.s__', Pathway)) %>%
+  #remove all unintegrated pathways
+  filter(!grepl('UNINTEGRATED|superpathway', Pathway))
+
+#Preparing data format to fit tse
+#list of pathways
+row_data <- abund_table %>% dplyr::select(Pathway)
+#give abundance table rowname
+abund_table <- abund_table %>% tibble::column_to_rownames(var="Pathway")
+#reordering to match
+genomic_idx <- match(rownames(meta), colnames(abund_table))
+genomic_idx
+abund_reordered  <- abund_table[ , genomic_idx]
+all(rownames(meta) == colnames(abund_reordered))
+#pathway abundance table needs to be same order
+pw1 <- as.matrix(abund_reordered)
+#read in as tse
+tse_func <- TreeSummarizedExperiment(assays = SimpleList(relabundance = pw1),
+                                     colData = DataFrame(meta),
+                                     rowData = DataFrame(row_data))
+
+tse_func
 ```
+subset for pathways that have at least 5% prevalence
 ```{r}
-df <- ancombc2_species$res %>%
-  dplyr::select(taxon, contains("Group.Bi"))
+tse_test <- tse_func %>% subsetByPrevalent (assay.type = "relabundance",
+          prevalence = 5/100)
+
 ```
+Linear model for differential abundance in predicted pathways
 ```{r}
-df %>%
-  mutate(across(where(is.numeric), round, 3)) %>%
-  #select(taxon, contains("Temiar")) %>%
-  filter(if_any(contains("q_"), ~ . < 0.05)) %>%
-  DT::datatable(caption = "Group") 
-  write.csv("./ancom-group.bi.csv")
+maaslin3_out <- maaslin3(
+  input_data = tse_test,
+  output = "Fun_DAA",
+  formula = " ~ Group + Reads",
+  normalization = "CLR",
+  transform = "NONE",
+  verbosity = "ERROR",
+  standardize = "TRUE",
+  reference = "Group,Malay",
+  warn_prevalence = "FALSE",
+  max_significance = 0.05,
+  correction = "BH",
+  plot_summary_plot = TRUE,
+  plot_associations = FALSE
+)
 ```
-Linear model
-```{r}
-subset_features_partial <-  purrr::partial(mia::agglomerateByPrevalence,
-                                           x = tse_species_BC,
-                                           detection = 0.1/100,
-                                           prevalence = 5/100,
-                                           assay.type = "relabundance") %>%
-  purrr::possibly()
-
-taxa_subsets <- c("species") %>%
-  rlang::set_names() %>%
-  purrr::map(subset_features_partial)
-
-melt_tse <- function(x, method = "clr") {
-    mia::transformAssay(x, assay.type = "relabundance", method = method, pseudocount = 1) %>% 
-    mia::meltSE(add_row_data = TRUE, assay.type = method) %>%
-    dplyr::mutate(FeatureID = glue::glue("GUT_{FeatureID}")) %>%
-    dplyr::select(SampleID, FeatureID, clr) %>%
-    tidyr::spread(FeatureID, clr) %>% 
-    dplyr::full_join(tse_meta(x), by = dplyr::join_by(SampleID == rownames))
-}
-
-dfs <- taxa_subsets %>%
-  purrr::map(melt_tse, .progress = TRUE)
-
-
-lm_group_partial <- purrr::partial(lm, formula = Group.Bi ~ term) %>%
-                    purrr::possibly()
-
-lm_group_model_for_taxon <- function(df, term, rank = NULL) {
- message(term)
- data <- if (is.null(rank)) df else df[[rank]]
- data <- data %>% dplyr::rename(term := {{term}})
- lm_group_partial(data = data)
-}
-
-# Step 4: Extract taxa names and run models
-taxa_rank_list <- dfs %>%
- purrr::imap(~ colnames(.x) %>% stringr::str_subset("GUT_") %>% rlang::set_names())
-
-df_lm_group_results <- taxa_rank_list %>%
- purrr::map_df(~tibble::tibble(taxa = .x), .id = "rank") %>% 
-  tidyr::gather(rank, taxa) %>%
-  dplyr::mutate(results = purrr::map2(rank, taxa, ~lm_group_model_for_taxon(df = dfs, term = .y, rank = .x))) %>%
-  dplyr::mutate(results = purrr::map(results, ~broom::tidy(.x, conf.int = TRUE)))  %>%
-  tidyr::unnest(results) %>%
-  dplyr::filter(stringr::str_detect(term, "term")) %>%
-  dplyr::mutate(qval_fdr = p.adjust(p.value, method = "BH")) %>%
-  dplyr::filter(qval_fdr < 0.1)
-
-# Step 5: Display results
-df_glm_group_results %>%
-  dplyr::arrange(qval_fdr) %>%
-  dplyr::mutate_if(is.numeric, ~round(.x, digits = 4)) %>%
-  #write.csv("df_lm.Group.BI.csv", col.names = TRUE)
-  DT::datatable(caption = "Linear model for Urban vs Rural")
-```
-
-
-
-
-
-
