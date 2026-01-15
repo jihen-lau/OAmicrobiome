@@ -1,0 +1,200 @@
+---
+title: "Orang Asli Resistome"
+author: "Li-Fang Yeo"
+format: html
+editor: visual
+---
+
+### Resistome analysis
+
+The study of the gut resistome of indigenous Orang Asli communities in Peninsular Malaysia, Temuan (urban), Temiar (semi-rural) and Jahai (hunter-gatherer). We used an urban Malay community as a comparator group.
+
+```{r,include=FALSE}
+#load libraries
+library(mia)
+library(tidyverse)
+library(dplyr)
+library(knitr)
+library(miaViz)
+library(stringr)
+library(maaslin3)
+library(tableone)
+library(ggsignif)
+```
+
+# Resfinder
+
+ARGs were mapped to Resfinder database
+
+```{r}
+#Data input 
+#file containting RPKM per ARG from resfinder
+kma_out <- read_csv("resistome/resistome/resfinder/kma_out.csv")
+
+#files needed to build tse
+counts <- kma_out %>% 
+  dplyr::select(sampleID, refSequence, RPKM) %>%
+  tidyr::pivot_wider(names_from = sampleID, values_from = RPKM)
+
+#this is the whole resfinder database
+tax <- read.csv("C:/Users/lifyeo/oa-microbiome/resistome/resistome/resfinder/raw/resfinder_db.csv")
+
+tax_list <- counts %>% 
+  dplyr::select(refSequence)
+
+#to match the number of tax to abundance table  
+tax <- tax_list %>% dplyr::left_join(tax, join_by("refSequence"))
+tax <- tax %>% tibble::column_to_rownames(var = "refSequence")
+counts <- counts %>% tibble::column_to_rownames("refSequence")
+meta <- read.csv("Metafile.csv", row.names = 1, header = TRUE)
+
+##QC to check data format and matching rows
+#match rows and columns
+genomic_idx <- match(rownames(meta), colnames(counts))
+genomic_idx
+counts_reordered  <- counts[ , genomic_idx]
+all(rownames(meta) == colnames(counts_reordered))
+all(rownames(tax) == rownames(counts_reordered))
+#data needs to be in numeric matrix format
+counts_reordered <- as.matrix(counts_reordered)
+# Replace NAs with zeroes
+counts_reordered[is.na(counts_reordered)] <- 0
+# Remove rows and cols with zero variance
+counts_reordered <- counts_reordered[rowSds(counts_reordered)>0, colSds(counts_reordered)>0]
+
+class(meta)
+class(tax)
+class(counts_reordered)
+
+tse_arg <- TreeSummarizedExperiment(
+    assays =  SimpleList(counts = counts_reordered),
+    colData = DataFrame(meta),
+    rowData = DataFrame(tax))
+
+tse_arg
+```
+
+Alpha diversity - Shannon
+
+```{r}
+tse_arg <- mia::addAlpha(tse_arg, 
+                              assay.type = "counts",
+                              index = "shannon", 
+                              name = "shannon")
+df<- as.data.frame(colData(tse_arg))
+
+#change level
+df$Group <- factor(df$Group, levels = c("Jahai", "Temiar", "Temuan", "Malay"))
+# For significance testing, all different combinations are determined
+comb <- split(t(combn(levels(df$Group), 2)), 
+           seq(nrow(t(combn(levels(df$Group), 2)))))
+#coloured by increasing rural-ness
+
+my_colors <- c("Malay"="darkkhaki", "Temuan"="#8eb79c","Temiar"= "#4b705c","Jahai" = "black")
+#pdf("alpha_arg.pdf")
+p<- ggplot(df, aes(x = Group, y = shannon, fill = Group)) +
+  # Outliers are removed, because otherwise each 
+  # data point would be plotted twice; 
+  # as an outlier of boxplot and as a point of dotplot.
+  geom_boxplot(outlier.shape = NA) + 
+  geom_jitter(width = 0.2) + 
+  geom_signif(comparisons = comb, map_signif_level = FALSE,
+               step_increase = 0.1) + #Corrects the p-values and step increase minimise overlap
+  theme(text = element_text(size = 6)) + theme_classic() +
+  scale_fill_manual(values = my_colors)
+
+ggsave("alpha_arg.pdf",
+       p, 
+       width = 8,
+       height = 6,
+       units = "in")
+
+```
+
+Beta diversity - Bray curtis
+
+```{r}
+x1 <- runRDA(tse_arg,
+               assay.type = "counts",
+               formula = assay ~ Group + Reads,
+               distance = "bray",
+               na.action = na.exclude)
+
+# Store results of PERMANOVA test
+rda_info <- attr(reducedDim(x1, "RDA"), "significance")
+```
+
+PERMANOVA
+
+```{r}
+rda_info$permanova |>
+  knitr::kable()
+
+write.csv(rda_info$permanova, "permanova_ARG.csv")
+```
+
+```{r}
+#homogeneity test
+rda_info$homogeneity |>
+  knitr::kable()
+
+write.csv(rda_info$homogeneity, "homogeneity_ARG.csv")
+```
+
+RDA plot
+
+```{r}
+#dbRDA plot
+p <- plotRDA(x1, "RDA", add.ellipse = TRUE, color_by = "Group") +
+  scale_color_manual(values = my_colors, name = "Groups",
+  breaks = c("Jahai", "Temiar", "Temuan", "Malay")) +
+  theme_classic() 
+p
+```
+
+```{r}
+#plot dbRDA loadings
+L <- miaViz::plotLoadings(x1, "RDA", ncomponents = 2, n = 10)
+
+L<- L + scale_fill_manual(name = "Effect", 
+                          values = c("lightblue", "maroon"),
+                          labels = c('Negative', 'Positive'))
+
+L
+library(patchwork)
+p / L
+onni <- p / L
+ggsave("RDA-loadings-ARG.pdf",
+       onni, 
+       width = 8,
+       height = 8,
+       units = "in")
+```
+Differential abundance analysis - resfinder
+```{r}
+tse4 <- tse_arg %>% 
+  mia::agglomerateByPrevalence(assay.type = "counts",
+                               detection =  0.1/100,
+                               prevalence = 5/100)
+  
+
+maaslin3_out <- maaslin3(
+  input_data = tse4,
+  output = "ARG_DAA1",
+  formula = " ~ Group + Reads",
+  normalization = "CLR",
+  transform = "NONE",
+  verbosity = "ERROR",
+  standardize = "TRUE",
+  reference = "Group,Malay",
+  warn_prevalence = "FALSE",
+  max_significance = 0.05,
+  correction = "BH",
+  plot_summary_plot = TRUE,
+  plot_associations = FALSE
+)
+
+
+```
+
+

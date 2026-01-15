@@ -1,7 +1,7 @@
 ---
 title: "OA-microbiome"
 author: "Li-Fang Yeo"
-date: "12 Dec 2024"
+date: "21st Nov 2025"
 output: html_document
 ---
 
@@ -15,18 +15,38 @@ library(tidyverse)
 library(dplyr)
 library(knitr)
 library(miaViz)
-library(ANCOMBC)
-library(Maaslin2)
+library(stringr)
+library(maaslin3)
+library(tableone)
+library(ggsignif)
 ```
+```{r}
+#function to make my life easier
+#This function works like dplyr::mutate
+tse_mutate <- function(.data, ...) {
+  dots <- rlang::enquos(...)
+  new_data <-  tse_meta(.data) %>%
+    dplyr::mutate(!!!dots) %>%
+    tibble::column_to_rownames(var = "rownames") %>%
+    S4Vectors::DataFrame()
+  SummarizedExperiment::colData(.data) <- new_data
+  .data
+}
+#this function is needed for tse_mutate to work
+tse_meta <- function(x, rownames = TRUE) {
+  { if (inherits(x, "TreeSummarizedExperiment")) SummarizedExperiment::colData(x) else x } %>%
+    { if(rownames) tibble::as_tibble(., rownames = "rownames") else tibble::as_tibble(.) }
+}
+```
+
 Data input 
 ```{r}
 meta <- read.csv("Metafile.csv", row.names = 1, header = TRUE)
 #meta <- meta %>% mutate(Group = str_replace_all(Group,"Temiar", "A"))
 tse <- importMetaPhlAn("data/42_abund_fixed.txt", assay.type = "relabundance", col.data = meta, removeTaxaPrefixes = TRUE)
-tse
+tse <- tse %>% tse_mutate(dplyr::across(c(Group.Bi), as.factor))
 ```
 ```{r}
-library(tableone)
 myVars <- c("Age", "Systolic", "Diastolic", "BMI.1", "WaistCirc", "HbA1C.1",
           "H.pylori","Gender", "Smoke", "BMI", "HbA1C","Group")
 ## Vector of categorical variables that need transformation
@@ -39,26 +59,18 @@ write.csv(tab, "tableone.csv")
 ```{r}
 #agglomerate data
 x1 <- altExp(tse, "species")
-#Top10
-my_colors <- c("Jahai" = "darkgreen", "Temiar" = "skyblue", "Temuan" = "orange", "Malay" = "pink" )
-plotAbundanceDensity(x1, layout = "density", assay_name = "relabundance",
-                     n = 10, colour_by="Group", point_alpha=0.5) + scale_x_log10(label = scales::label_number()) +
-  scale_fill_manual(values = my_colors)
-```
-```{r}
-#Abundance
-plotAbundanceDensity(x1, layout = "jitter", assay.type = "relabundance",
-                     n = 20, point_size=1, point_shape=19, point_alpha=0.1, order_descending = TRUE) +
-  scale_x_log10(label = scales::percent)
+
+my_colors <- c("Malay"="darkkhaki", "Temuan"="#8eb79c","Temiar"= "#4b705c","Jahai" = "black")
+
 ```
 Alpha diversity 
 ```{r}
 library(scater)
 library(patchwork)
 library(ggsignif)
-x1 <- mia::estimateDiversity(x1, 
+x1 <- mia::addAlpha(x1, 
                               assay.type = "relabundance",
-                              index = "shannon", 
+                              index = "shannon_diversity", 
                               name = "shannon")
 df<- as.data.frame(colData(x1))
 #change level
@@ -67,232 +79,166 @@ df$Group <- factor(df$Group, levels = c("Jahai", "Temiar", "Temuan", "Malay"))
 comb <- split(t(combn(levels(df$Group), 2)), 
            seq(nrow(t(combn(levels(df$Group), 2)))))
 
-pdf("alpha.pdf")
-ggplot(df, aes(x = Group, y = shannon, fill = Group)) +
+p<- ggplot(df, aes(x = Group, y = shannon, fill = Group)) +
   # Outliers are removed, because otherwise each 
   # data point would be plotted twice; 
   # as an outlier of boxplot and as a point of dotplot.
   geom_boxplot(outlier.shape = NA) + 
   geom_jitter(width = 0.2) + 
-  geom_signif(comparisons = comb, map_signif_level = FALSE,
+  geom_signif(comparisons = comb, test = "wilcox.test", map_signif_level = FALSE,
               correction="fdr", step_increase = 0.1) + #Corrects the p-values and step increase minimise overlap
   theme(text = element_text(size = 6)) + theme_classic() +
   scale_fill_manual(values = my_colors)
-alpha
-
+ggsave("alpha.pdf",
+       p, 
+       width = 8,
+       height = 6,
+       units = "in")
 ```
 Beta diversity
 ```{r}
 x1 <- runRDA(x1,
                assay.type = "relabundance",
-               formula = assay ~ Gender + Age + Group,
+               formula = assay ~ Group + Reads,
                distance = "bray",
                na.action = na.exclude)
+
 # Store results of PERMANOVA test
 rda_info <- attr(reducedDim(x1, "RDA"), "significance")
 ```
 ```{r}
 rda_info$permanova |>
   knitr::kable()
+
+write.csv(rda_info$permanova, "permanova.csv")
 ```
 ```{r}
 rda_info$homogeneity |>
   knitr::kable()
+
+write.csv(rda_info$homogeneity, "homogeneity.csv")
 ```
 ```{r}
-# Generate RDA plot coloured by Group
-library(miaViz)
-plotRDA(x1, "RDA", colour_by = "Group", add.vectors = FALSE) +
-  scale_color_manual(values = my_colors)
-```
-Heatmap
-```{r}
-#Agglomerate to family level
-tse_fam <- altExp(tse, "family")
-# Add clr-transformation on samples to remove compositionality bias
-x1 <- transformAssay(x1, assay.type = "relabundance",
-                              method = "clr", pseudocount = TRUE)
-
-# Add standardize-transformation on features (taxa)
-x1 <- transformAssay(x1, assay.type = "clr", 
-                              MARGIN = "rows",
-                              method = "standardize", name = "clr_z")
-#Get top most abundant taxa and subset
-top_taxa <- getTop(x1, top = 30, assay.type = "relabundance")
-tse_species_subset <- x1[top_taxa, ]
+#dbRDA plot
+p <- plotRDA(x1, "RDA", add.ellipse = TRUE, color_by = "Group") +
+  scale_color_manual(values = my_colors, name = "Groups",
+  breaks = c("Jahai", "Temiar", "Temuan", "Malay")) +
+  theme_classic() 
+ggsave("RDA.pdf",
+       p, 
+       width = 8,
+       height = 6,
+       units = "in")
 ```
 ```{r}
-# Melt the assay for plotting purposes
-df <- meltSE(tse_species_subset, assay.type = "clr_z")
+#plot dbRDA loadings
+L <- miaViz::plotLoadings(x1, "RDA", ncomponents = 2, n = 10)
 
-# Determines the scaling of colours
-maxval <- round(max(abs(df$clr_z)))
-limits <- c(-maxval, maxval)
-breaks <- seq(from = min(limits), to = max(limits), by = 0.5)
-colours <- c("darkblue", "blue", "white", "red", "darkred")
+L<- L + scale_fill_manual(name = "Effect", 
+                          values = c("blue", "maroon"),
+                          labels = c('Negative', 'Positive'))
 
-# Creates a ggplot object
-ggplot(df, aes(x = SampleID, y = FeatureID, fill = clr_z)) +
-  geom_tile() +
-  scale_fill_gradientn(name = "CLR + Z transform", 
-                       breaks = breaks, limits = limits, colours = colours) + 
-  theme(text = element_text(size=10),
-        axis.text.x = element_text(angle=45, hjust=1),
-        legend.key.size = unit(1, "cm")) +
-  labs(x = "Samples", y = "Taxa")
+L
+library(patchwork)
+p / L
+onni <- p / L
+ggsave("RDA-loadings.pdf",
+       onni, 
+       width = 8,
+       height = 8,
+       units = "in")
 ```
-```{r}
-library(ComplexHeatmap)
 
-# Gets the assay table
-mat <- assay(tse_species_subset, "clr_z")
-
-# Creates the heatmap
-ComplexHeatmap::pheatmap(mat)
-```
-Create clusters through hierachical clustering and adding to the plot
-```{r}
-library(ape)
-
-# Hierarchical clustering
-taxa_hclust <- hclust(dist(mat), method = "complete")
-
-# Creates a phylogenetic tree
-taxa_tree <- as.phylo(taxa_hclust)
-
-library(ggtree)
-# Plot taxa tree
-taxa_tree <- ggtree(taxa_tree) + 
-  theme(plot.margin=margin(0,0,0,0)) # removes margins
-
-# Get order of taxa in plot
-taxa_ordered <- get_taxa_name(taxa_tree)
-
-taxa_tree
-```
-```{r}
-# Creates clusters
-taxa_clusters <- cutree(tree = taxa_hclust, k = 4)
-
-# Converts into data frame
-taxa_clusters <- data.frame(taxa.clusters = taxa_clusters)
-taxa_clusters$taxa.clusters <- factor(taxa_clusters$taxa.clusters)
-
-# Order data so that it's same as in the phylo tree
-taxa_clusters <- taxa_clusters[taxa_ordered, , drop = FALSE] 
-
-# Prints taxa and their clusters
-taxa_clusters
-
-```
-```{r}
-# Adds information to rowData
-rowData(tse_species_subset)$Taxclusters <- taxa_clusters[order(match(rownames(taxa_clusters), rownames(tse_species_subset))), ]
-
-# Prints taxa and their clusters
-rowData(tse_species_subset)$Taxclusters
-
-# Hierarchical clustering
-sample_hclust <- hclust(dist(t(mat)), method = "complete")
-
-# Creates a phylogenetic tree
-sample_tree <- as.phylo(sample_hclust)
-
-# Plot sample tree
-sample_tree <- ggtree(sample_tree) + layout_dendrogram() + 
-  theme(plot.margin=margin(0,0,0,0)) # removes margins
-
-# Get order of samples in plot
-samples_ordered <- rev(get_taxa_name(sample_tree))
-
-sample_tree
-
-# Creates clusters
-sample_clusters <- factor(cutree(tree = sample_hclust, k = 4))
-
-# Converts into data frame
-sample_data <- data.frame(sample.clusters = sample_clusters)
-
-# Order data so that it's same as in phylo tree
-sample_data <- sample_data[samples_ordered, , drop = FALSE] 
-
-# Order data based on the phylo tree
-tse_species_subset <- tse_species_subset[ , rownames(sample_data)]
-
-# Add sample type data
-sample_data$Group <- colData(tse_species_subset)$Group
-sample_data
-
-```
-```{r}
-# Determines the scaling of colors
-# Scale colors
-breaks <- seq(-ceiling(max(abs(mat))), ceiling(max(abs(mat))), 
-              length.out = ifelse( max(abs(mat))>5, 2*ceiling(max(abs(mat))), 10 ) )
-colors <- colorRampPalette(c("darkblue", "blue", "white", "red", "darkred"))(length(breaks)-1)
-ann_colors = list(
-    Group = c(Jahai = "darkgreen", Temiar = "skyblue", Temuan = "orange", Malay = "pink" ),
-    sample.clusters = c("1" = "forestgreen", "2" = "firebrick", "3" = "#56B4E9", "4" = "#999999"),
-    taxa.clusters = c("1" = "darkgoldenrod1", "2" = "deepskyblue", "3" = "darkseagreen3", "4" = "brown3"))
-
-pheatmap(mat, annotation_row = taxa_clusters, 
-         annotation_col = sample_data,
-         annotation_colors = ann_colors,
-         breaks = breaks,
-         color = colors)
-```
 Differential abundance analysis
 ```{r}
-# Load package
-library(ANCOMBC)
+tse3 <- tse %>% 
+  mia::agglomerateByRank(rank = "species") %>%
+  mia::agglomerateByPrevalence(assay.type = "relabundance",
+                               detection =  0.1/100,
+                               prevalence = 5/100)
+  
 
-# ANCOM-BC2
-tse_species_BC <- mia::subsetByPrevalentFeatures(x1, rank = "species",
-                                              detection = 0.1/100,
-                                              prevalence = 1/100,
-                                              as_relative = TRUE,
-                                              assay.type = "relabundance")
+maaslin3_out <- maaslin3(
+  input_data = tse3,
+  output = "DAA_taxa",
+  formula = " ~ Group + Reads",
+  normalization = "CLR",
+  transform = "NONE",
+  verbosity = "ERROR",
+  standardize = "TRUE",
+  reference = "Group,Malay",
+  warn_prevalence = "FALSE",
+  max_significance = 0.05,
+  correction = "BH",
+  plot_summary_plot = TRUE,
+  plot_associations = FALSE
+)
 ```
+## Predicted pathway analysis
 ```{r}
-pcol <- glue::glue("q_Group")
+pw <- read_delim("data/subset_pathabundance-cpm.tsv", 
+     delim = "\t", escape_double = FALSE, 
+     trim_ws = TRUE)
 ```
+Clean up
 ```{r}
-ancombc2_species <- ANCOMBC::ancombc2(data = tse_species_BC,
-            fix_formula = "Group",
-                         assay.type = "relabundance",
-                         p_adj_method = "holm",
-                         verbose = TRUE,
-                         neg_lb = TRUE,
-            mdfdr_control = list(fwer_ctrl_method = "holm", B = 100))
+colnames(pw) <- gsub("HFJYKBBXY_", "", colnames(pw))
+colnames(pw) <- gsub("HHCNCBBXY_", "", colnames(pw))
+colnames(pw) <- gsub("_.*", "", colnames(pw))
+pw <- pw %>% rename("Pathway"  = "# Pathway")
+
+#discrepancy between sampleID
+pw <- pw %>% dplyr::rename(TM0123M = TM123M) %>%
+            dplyr::rename(TM0167F = TM167F) %>%
+            dplyr::rename(TM0169M = TM169M)
+#Filter pathway abundance table first
+abund_table <- pw %>% 
+  filter(rowSums(across(where(is.numeric)))!=0) %>%
+  #grep all Pathways that end with species
+  filter(!grepl('.s__', Pathway)) %>%
+  #remove all unintegrated pathways
+  filter(!grepl('UNINTEGRATED|superpathway', Pathway))
+
+#Preparing data format to fit tse
+#list of pathways
+row_data <- abund_table %>% dplyr::select(Pathway)
+#give abundance table rowname
+abund_table <- abund_table %>% tibble::column_to_rownames(var="Pathway")
+#reordering to match
+genomic_idx <- match(rownames(meta), colnames(abund_table))
+genomic_idx
+abund_reordered  <- abund_table[ , genomic_idx]
+all(rownames(meta) == colnames(abund_reordered))
+#pathway abundance table needs to be same order
+pw1 <- as.matrix(abund_reordered)
+#read in as tse
+tse_func <- TreeSummarizedExperiment(assays = SimpleList(relabundance = pw1),
+                                     colData = DataFrame(meta),
+                                     rowData = DataFrame(row_data))
+
+tse_func
 ```
+subset for pathways that have at least 5% prevalence
 ```{r}
-df <- ancombc2_species$res %>%
-  dplyr::select(taxon, contains("Group"))
+tse_test <- tse_func %>% subsetByPrevalent (assay.type = "relabundance",
+          prevalence = 5/100)
+
 ```
+Linear model for differential abundance in predicted pathways
 ```{r}
-df %>%
-  mutate(across(where(is.numeric), round, 3)) %>%
-  #select(taxon, contains("Temiar")) %>%
-  filter(if_any(contains("q"), ~ . < 0.05)) %>%
-  #DT::datatable(caption = "Group") 
-  write.csv("./ancombc/temiar-ref/ancom-alt.csv")
+maaslin3_out <- maaslin3(
+  input_data = tse_test,
+  output = "Fun_DAA",
+  formula = " ~ Group + Reads",
+  normalization = "CLR",
+  transform = "NONE",
+  verbosity = "ERROR",
+  standardize = "TRUE",
+  reference = "Group,Malay",
+  warn_prevalence = "FALSE",
+  max_significance = 0.05,
+  correction = "BH",
+  plot_summary_plot = TRUE,
+  plot_associations = FALSE
+)
 ```
-```{r}
-maaslin2_out <- Maaslin2(
-    input_data = as.data.frame(t(assay(tse_species_BC))),
-    input_metadata = meta,
-    output = "DAA example",
-    fixed_effects = "Group",
-    # you can also fit MLM by specifying random effects
-    # random_effects = c(...),
-    reference = "Group,Malay",
-    normalization = "TSS",
-    standardize = FALSE,
-    # filtering was previously performed
-    min_prevalence = 0)
-```
-
-
-
-
-
