@@ -104,15 +104,15 @@ tribes <- c(
 
 # Define drug classes for each gene family
 geneFam_category <- c(
-  rep("Beta-lactamase", 6),
-  rep("Aminoglycosides", 7),
-  rep("Quinolone", 2),
-  "Colistin", 
+  rep("Beta-lactam", 6),
+  rep("Aminoglycoside", 7),
+  rep("Fluoroquinolone", 2),
+  "Polymyxins", 
   rep("Sulfonamide", 3),
-  rep("Tetracycline", 8),
-  rep("Erythromycin", 4),
+  rep("Tetracyclines", 8),
+  rep("Macrolide", 4),
   "Fosfomycin",
-  rep("Lincosamides", 4)
+  rep("Lincosamide", 4)
 )  
 
 # Create color mapping for heatmap
@@ -126,15 +126,15 @@ col_fun <- colorRamp2(breaks, colors)
 # Row annotation for drug classes
 row_anno <- rowAnnotation(
   `Drug Class` = anno_simple(geneFam_category, 
-                             col = c("Beta-lactamase" = "yellow",
-                                     "Aminoglycosides" = "green3",
-                                     "Quinolone" = "cyan",
-                                     "Colistin" = "purple",
+                             col = c("Beta-lactam" = "yellow",
+                                     "Aminoglycoside" = "green3",
+                                     "Fluoroquinolone" = "cyan",
+                                     "Polymyxins" = "purple",
                                      "Sulfonamide" = "red",
-                                     "Tetracycline" = "brown",
-                                     "Erythromycin" = "olivedrab",
+                                     "Tetracyclines" = "brown",
+                                     "Macrolide" = "olivedrab",
                                      "Fosfomycin" = "grey",
-                                     "Lincosamides" = "blue"
+                                     "Lincosamide" = "blue"
                                      )),
   show_annotation_name = FALSE
 )
@@ -163,8 +163,8 @@ column_anno <- HeatmapAnnotation(
 
 # Create custom legends
 drugClass_legend <- Legend(
-  labels = c("Beta-lactamase", "Aminoglycosides", "Quinolone", "Colistin", "Sulfonamide",
-             "Tetracycline", "Erythromycin","Fosfomycin","Lincosamides"),
+  labels = c("Beta-lactam", "Aminoglycoside", "Fluoroquinolone", "Polymyxins", "Sulfonamide",
+             "Tetracyclines", "Macrolide","Fosfomycin","Lincosamide"),
   legend_gp = gpar(fill = c("yellow", "green3", "cyan", "purple", "red",
                             "brown", "olivedrab","grey","blue")),
   title = "Drug Class"
@@ -196,7 +196,7 @@ draw(Heatmap(heatmap_matrix_log_T,
              column_names_side = "top",
              row_names_side = "left",
              # row_order = 1:nrow(heatmap_matrix_log_T),
-             show_heatmap_legend = FALSE,
+             show_heatmap_legend = TRUE,
              # Color scale
              col = col_fun,
              # Annotations
@@ -204,8 +204,8 @@ draw(Heatmap(heatmap_matrix_log_T,
              left_annotation = row_anno,
              # Grouping
              column_split = factor(tribes, levels = c("Jahai", "Temiar", "Temuan", "Malay")),
-             row_split = factor(geneFam_category, levels = c("Beta-lactamase", "Aminoglycosides", "Quinolone", "Colistin", "Sulfonamide", 
-                                                             "Tetracycline", "Erythromycin", "Fosfomycin", "Lincosamides")),
+             row_split = factor(geneFam_category, levels = c("Beta-lactam", "Aminoglycoside", "Fluoroquinolone", "Polymyxins", "Sulfonamide", 
+                                                             "Tetracyclines", "Macrolide", "Fosfomycin", "Lincosamide")),
              # Cell borders
              cell_fun = function(j, i, x, y, width, height, fill) {
                grid.rect(x = x, y = y, width = width, height = height, 
