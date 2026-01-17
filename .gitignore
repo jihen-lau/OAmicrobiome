@@ -8,3 +8,7 @@
 # Ignore Rhistory, RData
 *.Rhistory
 *.RData
+
+# Ignore raw data and plots output
+OAmicrobiome_plots/
+resistome/
